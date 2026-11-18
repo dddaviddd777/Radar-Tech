@@ -27,6 +27,7 @@
   --s-sma50: #eb6834;
   --s-sma200: #1baf7a;
   --s-wma: #6250d6;
+  --s-pe: #b8398a;
   --good: #0ca30c;
   --good-bg: #e3f4e3;
   --warn: #b77f00;
@@ -51,6 +52,7 @@
     --s-sma50: #d95926;
     --s-sma200: #199e70;
     --s-wma: #9085e9;
+    --s-pe: #e070b8;
     --good: #0ca30c;
     --good-bg: #16301a;
     --warn: #fab219;
@@ -64,7 +66,7 @@
   color-scheme: dark;
   --bg: #121211; --surface: #1a1a19; --surface-2: #222220; --border: #2e2e2b; --grid: #262624;
   --text: #f0efec; --text-2: #c3c2b7; --text-3: #8d8c84; --accent: #3987e5;
-  --s-price: #3987e5; --s-sma50: #d95926; --s-sma200: #199e70; --s-wma: #9085e9;
+  --s-price: #3987e5; --s-sma50: #d95926; --s-sma200: #199e70; --s-wma: #9085e9; --s-pe: #e070b8;
   --good: #0ca30c; --good-bg: #16301a; --warn: #fab219; --warn-bg: #352a10; --muted-bg: #262624;
   --up: #2fbf4f; --down: #e66767;
 }
@@ -121,6 +123,7 @@ select { font: inherit; font-weight: 600; font-size: 17px; background: var(--sur
 
 .chart-box { position: relative; height: 340px; }
 .rsi-box { position: relative; height: 110px; margin-top: 6px; }
+.pe-box { position: relative; height: 130px; margin-top: 6px; }
 .rsi-title { font-size: 12px; color: var(--text-3); margin-top: 12px; }
 
 /* fitxa d'indicadors */
@@ -170,6 +173,9 @@ tbody tr:last-child td { border-bottom: 0; }
   h1 { font-size: 22px; }
   .meta { text-align: left; }
   .chart-box { height: 260px; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { padding: 8px 10px; }
+  .stat .v { font-size: 15px; }
   .hide-sm { display: none; }
   td, th { padding-left: 8px; padding-right: 8px; }
   .scorebar .bar { display: none; }
@@ -196,8 +202,9 @@ tbody tr:last-child td { border-bottom: 0; }
   <div id="app"></div>
 
   <div class="foot">
-    <b>Com es calcula la puntuació d'oferta (0–100):</b> 40 punts segons la distància a la mitjana de 200 setmanes (màxim si el preu hi és a sobre o per sota, zero si la supera en un 60% o més), 35 punts segons la caiguda des del màxim de 52 setmanes (màxim a partir d'un −35%) i 25 punts segons l'RSI de 14 dies (màxim a 30 o menys, zero a 70 o més). <b>Oferta</b> a partir de 65, <b>Vigilar</b> entre 40 i 64.<br>
-    Dades de tancament diari (Yahoo Finance), actualitzades cada dia feiner després del tancament de Wall Street. Preus en dòlars. Eina de seguiment, no és un consell d'inversió.
+    <span id="scoreFoot"></span><br>
+    <b>PER:</b> preu dividit pel benefici per acció. El <b>PER (12 mesos)</b> usa el benefici dels últims quatre trimestres publicats; el <b>PER forward</b>, el benefici que els analistes esperen per als propers 12 mesos. Com més baix, més barata respecte al que guanya l'empresa.<br>
+    Dades de tancament diari i fonamentals de Yahoo Finance, actualitzades cada dia feiner després del tancament de Wall Street. Preus en dòlars. Eina de seguiment, no és un consell d'inversió.
   </div>
 </div>
 
@@ -262,6 +269,15 @@ tbody tr:last-child td { border-bottom: 0; }
     const up = new Date(data.updated);
     document.getElementById('updated').textContent = 'Actualitzat: ' + up.toLocaleString('ca-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     if (data.demo) document.getElementById('demo').innerHTML = '<span class="badge">Dades de prova</span>';
+    const w = data.weights || { wma: 40, dd: 35, rsi: 25, pe: 0 };
+    const pr = data.params || { wmaFar: 60, ddFull: 35, rsiLow: 30, rsiHigh: 70 };
+    const th0 = data.thresholds;
+    document.getElementById('scoreFoot').innerHTML = `<b>Com es calcula la puntuació d'oferta (0–100):</b>
+      ${w.wma} punts segons la distància a la mitjana de 200 setmanes (màxim si el preu hi és a sobre o per sota, zero si la supera en un ${pr.wmaFar}% o més),
+      ${w.dd} punts segons la caiguda des del màxim de 52 setmanes (màxim a partir d'un −${pr.ddFull}%),
+      ${w.rsi} punts segons l'RSI de 14 dies (màxim a ${pr.rsiLow} o menys, zero a ${pr.rsiHigh} o més)` +
+      (w.pe ? ` i ${w.pe} punts segons el PER dels últims 12 mesos comparat amb la seva mediana de ${pr.peYears} anys (màxim si és un ${pr.peCheap}% o més per sota, zero si és un ${pr.peDear}% o més per sobre; si no hi ha dades, compta com si fos a la mediana)` : '') +
+      `. <b>Oferta</b> a partir de ${th0.offer}, <b>Vigilar</b> entre ${th0.watch} i ${th0.offer - 1}.`;
 
     document.getElementById('app').innerHTML = `
       <div class="panel offers" id="offers"></div>
@@ -281,6 +297,8 @@ tbody tr:last-child td { border-bottom: 0; }
         <div class="chart-box"><canvas id="cv" aria-label="Gràfica de preu i mitjanes"></canvas></div>
         <div class="rsi-title" id="rsiTitle">RSI de 14 dies · per sota de 30 = sobrevenda, per sobre de 70 = sobrecompra</div>
         <div class="rsi-box" id="rsiBox"><canvas id="cvRsi" aria-label="Gràfica de l'RSI"></canvas></div>
+        <div class="rsi-title" id="peTitle"></div>
+        <div class="pe-box" id="peBox"><canvas id="cvPe" aria-label="Gràfica del PER"></canvas></div>
         <div class="stats" id="stats"></div>
         <div class="score-explain" id="explain"></div>
       </section>
@@ -294,6 +312,8 @@ tbody tr:last-child td { border-bottom: 0; }
             <th data-k="distWma">vs 200 setm.</th>
             <th data-k="drawdown" class="hide-sm">Des del màx.</th>
             <th data-k="rsi" class="hide-sm">RSI</th>
+            <th data-k="fwdPE" class="hide-sm" title="Preu / benefici previst per als propers 12 mesos">PER fwd</th>
+            <th data-k="peVsHist" class="hide-sm" title="PER dels últims 12 mesos respecte a la seva mediana de 5 anys">PER vs hist.</th>
             <th data-k="score">Puntuació</th>
             <th data-k="status" class="hide-sm">Estat</th>
           </tr></thead>
@@ -309,7 +329,7 @@ tbody tr:last-child td { border-bottom: 0; }
     });
     document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
       const k = th.dataset.k;
-      state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (k === 't' || k === 'distWma' || k === 'rsi' ? 1 : -1) };
+      state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (['t', 'distWma', 'rsi', 'fwdPE', 'peVsHist'].includes(k) ? 1 : -1) };
       renderTable();
     }));
 
@@ -354,7 +374,8 @@ tbody tr:last-child td { border-bottom: 0; }
       let x = a[key], y = b[key];
       if (key === 'status') { x = order[x]; y = order[y]; }
       if (typeof x === 'string') return dir * x.localeCompare(y);
-      return dir * ((x ?? -Infinity) - (y ?? -Infinity));
+      if (x == null || y == null) return (x == null) - (y == null);  // sense dades, sempre al final
+      return dir * (x - y);
     });
     document.querySelectorAll('th').forEach(th => {
       th.classList.toggle('sorted', th.dataset.k === key);
@@ -368,6 +389,8 @@ tbody tr:last-child td { border-bottom: 0; }
         <td class="num">${pct(t.distWma)}</td>
         <td class="num hide-sm">${t.drawdown > 0.05 ? '−' + fmt(t.drawdown, 1) + '%' : '0%'}</td>
         <td class="num hide-sm">${fmt(t.rsi, 0)}</td>
+        <td class="num hide-sm">${fmt(t.fwdPE, 1)}</td>
+        <td class="num hide-sm ${t.peVsHist == null ? '' : t.peVsHist <= -15 ? 'up' : t.peVsHist >= 15 ? 'down' : ''}">${pct(t.peVsHist, 0)}</td>
         <td><span class="scorebar"><span class="bar"><i style="width:${t.score}%;${t.status === 'oferta' ? 'background:var(--good)' : t.status === 'vigilar' ? 'background:var(--warn)' : ''}"></i></span><span class="num">${t.score}</span></span></td>
         <td class="hide-sm">${statusPill(t.status)}</td>
       </tr>`).join('');
@@ -507,23 +530,72 @@ tbody tr:last-child td { border-bottom: 0; }
       });
     }
 
+    // PER dels últims 12 mesos, amb la seva mediana de 5 anys
+    const peBox = document.getElementById('peBox'), peTitle = document.getElementById('peTitle');
+    const peData = (src.pe || []).slice(start);
+    const hasPe = peData.some(v => v != null);
+    peBox.style.display = peTitle.style.display = hasPe ? '' : 'none';
+    if (state.peChart) { state.peChart.destroy(); state.peChart = null; }
+    if (hasPe) {
+      const med = t.peMed;
+      peTitle.textContent = 'PER dels últims 12 mesos' + (med ? ` · línia discontínua = mediana de 5 anys (${fmt(med, 1)})` : '');
+      const vals = peData.filter(v => v != null);
+      // la mediana sempre visible; els PER extrems (beneficis gairebé zero) aixafarien la gràfica: limitem l'escala
+      const yMax = med ? Math.min(Math.max(...vals, med), med * 3) * 1.1 : undefined;
+      const medLine = {
+        id: 'medLine',
+        beforeDatasetsDraw(chart) {
+          if (!med) return;
+          const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+          const py = y.getPixelForValue(med);
+          ctx.save(); ctx.strokeStyle = text3; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(right, py); ctx.stroke(); ctx.restore();
+        }
+      };
+      state.peChart = new Chart(document.getElementById('cvPe'), {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'PER', data: peData, borderColor: css('--s-pe'), backgroundColor: css('--s-pe'), borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, pointHoverBorderColor: surface, tension: 0, spanGaps: false }] },
+        options: {
+          ...baseOpts,
+          plugins: { ...baseOpts.plugins, tooltip: { ...baseOpts.plugins.tooltip, callbacks: { ...baseOpts.plugins.tooltip.callbacks, label: it => ` PER: ${fmt(it.parsed.y, 1)}` } } },
+          scales: { x: { ...baseOpts.scales.x, ticks: { ...baseOpts.scales.x.ticks, display: false } },
+                    y: { position: 'right', min: 0, max: yMax, grid: { color: grid }, border: { display: false },
+                         ticks: { color: text3, maxTicksLimit: 4, font: { family: '"IBM Plex Mono", ui-monospace, monospace', size: 11 }, callback: v => fmt(v, 0) } } },
+        },
+        plugins: [medLine, crosshair],
+      });
+    }
+
     // fitxa
-    document.getElementById('stats').innerHTML = [
+    const days = t.nextEarnings ? Math.round((new Date(t.nextEarnings + 'T12:00') - new Date()) / 864e5) : null;
+    const fundStats = [
+      ['PER forward', fmt(t.fwdPE, 1), t.pe != null ? `PER 12 mesos: ${fmt(t.pe, 1)}` : 'PER 12 mesos: sense dades (pèrdues)'],
+      ['PER vs el seu habitual', pct(t.peVsHist, 0), t.peMed != null ? `Mediana de 5 anys: ${fmt(t.peMed, 1)}` : 'Sense prou historial'],
+      ['Objectiu dels analistes', t.target != null ? fmt(t.target) + ' $' : '—',
+        t.target != null ? `${pct(t.targetUp, 0)} · ${t.analysts ?? '?'} analistes${t.rec ? ' · ' + t.rec : ''}` : 'Sense dades'],
+      ['Propers resultats', t.nextEarnings ? dLabel(t.nextEarnings, true) : '—',
+        days == null ? 'Data no anunciada' : days <= 0 ? 'Avui' : days === 1 ? 'Demà' : `D'aquí a ${days} dies` + (days <= 7 ? ' · possible moviment fort' : '')],
+    ];
+    document.getElementById('stats').innerHTML = [...fundStats,
       ['Mitjana 200 setmanes', fmt(t.wma200) + ' $', `Preu ${pct(t.distWma)} respecte a la mitjana`],
       ['Màxim 52 setmanes', fmt(t.high52) + ' $', t.drawdown > 0.05 ? `Ha caigut un ${fmt(t.drawdown, 1)}%` : 'Cotitza en màxims'],
       ['RSI 14 dies', fmt(t.rsi, 0), t.rsi < 30 ? 'Sobrevenda' : t.rsi > 70 ? 'Sobrecompra' : 'Zona neutra'],
       ['Mitjanes 50 / 200 dies', `${fmt(t.sma50, 0)} / ${fmt(t.sma200, 0)}`, t.sma50 > t.sma200 ? 'Tendència alcista (50 > 200)' : 'Tendència baixista (50 < 200)'],
     ].map(([k, v, h]) => `<div class="stat"><div class="k">${k}</div><div class="v num">${v}</div><div class="h">${h}</div></div>`).join('');
 
-    const p = t.parts;
+    const p = t.parts, w = state.data.weights || { wma: 40, dd: 35, rsi: 25, pe: 0 };
+    const comps = [
+      ['wma', '--s-wma', 'Mitjana 200 setm.'],
+      ['dd', '--s-sma50', 'Caiguda des del màx.'],
+      ['rsi', '--s-sma200', 'RSI'],
+      ['pe', '--s-pe', 'PER vs habitual'],
+    ].filter(([k]) => w[k]);
     document.getElementById('explain').innerHTML = `
       <b style="color:var(--text)">Puntuació d'oferta: <span class="num">${t.score}</span>/100</b>
       <div class="parts" role="img" aria-label="Desglossament de la puntuació">
-        <span style="width:${p.wma}%;background:var(--s-wma)"></span><span style="width:${p.dd}%;background:var(--s-sma50)"></span><span style="width:${p.rsi}%;background:var(--s-sma200)"></span>
+        ${comps.map(([k, c]) => `<span style="width:${p[k] ?? 0}%;background:var(${c})"></span>`).join('')}
       </div>
-      ${lineIcon(css('--s-wma'), [])} Mitjana 200 setm. <span class="num">${p.wma}</span>/40 &nbsp;
-      ${lineIcon(css('--s-sma50'), [])} Caiguda des del màx. <span class="num">${p.dd}</span>/35 &nbsp;
-      ${lineIcon(css('--s-sma200'), [])} RSI <span class="num">${p.rsi}</span>/25`;
+      ${comps.map(([k, c, l]) => `${lineIcon(css(c), [])} ${l} <span class="num">${p[k] ?? 0}</span>/${w[k]}`).join(' &nbsp;\n')}`;
   }
 
   let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => state.data && renderChart(), 200); });
