@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar Tech</title>
+<meta name="description" content="Seguiment diari de grans tecnològiques: mitjana de 200 setmanes, RSI, caiguda des del màxim i puntuació d'oferta.">
+<meta name="theme-color" content="#121211">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23121211'/><path d='M5 22 L12 15 L17 19 L27 8' stroke='%233987e5' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f3f0;
+  --surface: #fcfcfb;
+  --surface-2: #f0efeb;
+  --border: #e2e0da;
+  --grid: #ebe9e4;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #85847e;
+  --accent: #2a78d6;
+  --s-price: #2a78d6;
+  --s-sma50: #eb6834;
+  --s-sma200: #1baf7a;
+  --s-wma: #6250d6;
+  --good: #0ca30c;
+  --good-bg: #e3f4e3;
+  --warn: #b77f00;
+  --warn-bg: #fbf0d6;
+  --muted-bg: #ecebe7;
+  --up: #0b8a0b;
+  --down: #c93434;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --surface-2: #222220;
+    --border: #2e2e2b;
+    --grid: #262624;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --text-3: #8d8c84;
+    --accent: #3987e5;
+    --s-price: #3987e5;
+    --s-sma50: #d95926;
+    --s-sma200: #199e70;
+    --s-wma: #9085e9;
+    --good: #0ca30c;
+    --good-bg: #16301a;
+    --warn: #fab219;
+    --warn-bg: #352a10;
+    --muted-bg: #262624;
+    --up: #2fbf4f;
+    --down: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #222220; --border: #2e2e2b; --grid: #262624;
+  --text: #f0efec; --text-2: #c3c2b7; --text-3: #8d8c84; --accent: #3987e5;
+  --s-price: #3987e5; --s-sma50: #d95926; --s-sma200: #199e70; --s-wma: #9085e9;
+  --good: #0ca30c; --good-bg: #16301a; --warn: #fab219; --warn-bg: #352a10; --muted-bg: #262624;
+  --up: #2fbf4f; --down: #e66767;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 56px; }
+
+header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0; display: flex; align-items: center; gap: 10px; }
+h1 svg { flex: none; }
+.sub { color: var(--text-2); font-size: 14px; margin-top: 2px; }
+.meta { color: var(--text-3); font-size: 13px; text-align: right; }
+.badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-weight: 500; }
+.theme-btn { background: none; border: 1px solid var(--border); color: var(--text-2); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; margin-left: 8px; }
+
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+h2 { font-size: 15px; font-weight: 600; margin: 0; }
+
+/* bàner d'ofertes */
+.offers { padding: 14px 18px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.offers .label { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 3px 10px 3px 8px; font-size: 13px; cursor: pointer; color: var(--text); font-family: inherit; }
+.chip:hover { border-color: var(--text-3); }
+.chip b { font-weight: 600; }
+.offers .none { color: var(--text-2); font-size: 14px; }
+
+/* gràfica */
+.chart-panel { padding: 18px; margin-bottom: 16px; }
+.chart-head { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+select { font: inherit; font-weight: 600; font-size: 17px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 6px 30px 6px 12px; appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' stroke='%2385847e' stroke-width='1.6' fill='none'/></svg>"); background-repeat: no-repeat; background-position: right 11px center; }
+.big-price { font-size: 22px; font-weight: 500; }
+.chg { font-size: 14px; }
+.up { color: var(--up); } .down { color: var(--down); }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; border: 0; background: none; color: var(--text-2); padding: 4px 12px; border-radius: 7px; cursor: pointer; }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 10px; }
+.lg { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; color: var(--text-2); background: none; border: 1px solid transparent; border-radius: 8px; padding: 3px 8px; cursor: pointer; }
+.lg:hover { border-color: var(--border); }
+.lg.off { opacity: .4; }
+.lg:disabled { opacity: .25; cursor: not-allowed; }
+.lg svg { flex: none; }
+
+.chart-box { position: relative; height: 340px; }
+.rsi-box { position: relative; height: 110px; margin-top: 6px; }
+.rsi-title { font-size: 12px; color: var(--text-3); margin-top: 12px; }
+
+/* fitxa d'indicadors */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 18px; }
+.stat { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.stat .k { font-size: 12px; color: var(--text-3); }
+.stat .v { font-size: 17px; font-weight: 500; margin-top: 2px; }
+.stat .h { font-size: 12px; color: var(--text-2); }
+.score-explain { margin-top: 14px; font-size: 13px; color: var(--text-2); }
+.parts { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--muted-bg); margin: 6px 0 4px; gap: 2px; }
+.parts span { display: block; height: 100%; }
+
+/* taula */
+.table-panel { padding: 6px 0 0; }
+.table-panel .th-head { padding: 12px 18px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.table-panel .th-head .hint { font-size: 12px; color: var(--text-3); }
+.tbl-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: right; font-weight: 500; font-size: 12px; color: var(--text-3); padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; padding-left: 18px; }
+th:last-child, td:last-child { padding-right: 18px; }
+th.sorted { color: var(--text); }
+td { text-align: right; padding: 10px 12px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr.sel { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
+tbody tr:last-child td { border-bottom: 0; }
+.tk { font-weight: 600; }
+.nm { color: var(--text-3); font-size: 12px; display: block; }
+.scorebar { display: inline-flex; align-items: center; gap: 8px; }
+.scorebar .bar { width: 64px; height: 6px; border-radius: 3px; background: var(--muted-bg); overflow: hidden; }
+.scorebar .bar i { display: block; height: 100%; border-radius: 3px; background: var(--text-3); }
+.st { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 2px 9px 2px 7px; border-radius: 999px; }
+.st.oferta { background: var(--good-bg); color: var(--good); }
+.st.vigilar { background: var(--warn-bg); color: var(--warn); }
+.st.alt { background: var(--muted-bg); color: var(--text-2); }
+.stale { color: var(--warn); font-size: 11px; }
+
+.foot { color: var(--text-3); font-size: 12px; margin-top: 24px; line-height: 1.6; }
+.foot b { color: var(--text-2); font-weight: 500; }
+
+.empty { padding: 48px 24px; text-align: center; color: var(--text-2); }
+.empty h2 { font-size: 18px; margin-bottom: 6px; color: var(--text); }
+
+@media (max-width: 720px) {
+  .wrap { padding-top: 16px; }
+  h1 { font-size: 22px; }
+  .meta { text-align: left; }
+  .chart-box { height: 260px; }
+  .hide-sm { display: none; }
+  td, th { padding-left: 8px; padding-right: 8px; }
+  .scorebar .bar { display: none; }
+  table { font-size: 13px; }
+  th:first-child, td:first-child { padding-left: 12px; } th:last-child, td:last-child { padding-right: 12px; }
+  th { white-space: normal; }
+  .nm { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--text)"/><path d="M5 22 L12 15 L17 19 L27 8" stroke="var(--bg)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Radar Tech
+      </h1>
+      <div class="sub">Grans tecnològiques: quan cotitzen barates respecte al seu propi historial</div>
+    </div>
+    <div class="meta"><span id="updated">Carregant…</span> <span id="demo"></span><button class="theme-btn" id="themeBtn" type="button">◐ Tema</button></div>
+  </header>
+
+  <div id="app"></div>
+
+  <div class="foot">
+    <b>Com es calcula la puntuació d'oferta (0–100):</b> 40 punts segons la distància a la mitjana de 200 setmanes (màxim si el preu hi és a sobre o per sota, zero si la supera en un 60% o més), 35 punts segons la caiguda des del màxim de 52 setmanes (màxim a partir d'un −35%) i 25 punts segons l'RSI de 14 dies (màxim a 30 o menys, zero a 70 o més). <b>Oferta</b> a partir de 65, <b>Vigilar</b> entre 40 i 64.<br>
+    Dades de tancament diari (Yahoo Finance), actualitzades cada dia feiner després del tancament de Wall Street. Preus en dòlars. Eina de seguiment, no és un consell d'inversió.
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- tema
+  const themeBtn = document.getElementById('themeBtn');
+  const savedTheme = (() => { try { return localStorage.getItem('rt-theme'); } catch { return null; } })();
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  themeBtn.addEventListener('click', () => {
+    const isDark = getComputedStyle(document.documentElement).colorScheme === 'dark';
+    const next = isDark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('rt-theme', next); } catch {}
+    if (state.data) renderChart();
+  });
+
+  Chart.defaults.font.family = '"IBM Plex Sans", system-ui, sans-serif';
+  Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--text-3').trim();
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const fmt = (v, d = 2) => v == null ? '—' : v.toLocaleString('ca-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const pct = (v, d = 1) => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v), d) + '%';
+  const STATUS = {
+    oferta: { label: 'Oferta', icon: '●' },
+    vigilar: { label: 'Vigilar', icon: '◐' },
+    alt: { label: 'Preu alt', icon: '○' },
+  };
+  const MONTHS = ['gen', 'febr', 'març', 'abr', 'maig', 'juny', 'jul', 'ag', 'set', 'oct', 'nov', 'des'];
+  const dLabel = (s, withYear) => { const [y, m, d] = s.split('-'); return `${+d} ${MONTHS[+m - 1]}` + (withYear ? ` ${y}` : ''); };
+
+  const state = {
+    data: null, ticker: null, range: '6M',
+    show: (() => { try { return JSON.parse(localStorage.getItem('rt-show')) || null; } catch { return null; } })()
+      || { c: true, s50: true, s200: true, w200: true },
+    sort: { key: 'score', dir: -1 },
+    chart: null, rsiChart: null,
+  };
+  try { state.ticker = localStorage.getItem('rt-ticker'); } catch {}
+
+  const SERIES = [
+    { key: 'c', label: 'Preu de tancament', color: '--s-price', dash: [], width: 2 },
+    { key: 's50', label: 'Mitjana 50 dies', color: '--s-sma50', dash: [], width: 1.5, dailyOnly: true },
+    { key: 's200', label: 'Mitjana 200 dies', color: '--s-sma200', dash: [6, 4], width: 1.5, dailyOnly: true },
+    { key: 'w200', label: 'Mitjana 200 setmanes', color: '--s-wma', dash: [2, 3], width: 2.5 },
+  ];
+
+  // ---------- dades
+  fetch('data/data.json?t=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(init)
+    .catch(() => {
+      document.getElementById('updated').textContent = '';
+      document.getElementById('app').innerHTML = `<div class="panel empty"><h2>Encara no hi ha dades</h2>
+        Les dades es generen automàticament cada dia feiner. Si acabes de crear el projecte, ves a la pestanya
+        <b>Actions</b> de GitHub i executa “Actualitzar dades i publicar” amb el botó <b>Run workflow</b>.</div>`;
+    });
+
+  function init(data) {
+    state.data = data;
+    const byT = Object.fromEntries(data.tickers.map(t => [t.t, t]));
+    if (!byT[state.ticker]) state.ticker = [...data.tickers].sort((a, b) => b.score - a.score)[0].t;
+    const up = new Date(data.updated);
+    document.getElementById('updated').textContent = 'Actualitzat: ' + up.toLocaleString('ca-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    if (data.demo) document.getElementById('demo').innerHTML = '<span class="badge">Dades de prova</span>';
+
+    document.getElementById('app').innerHTML = `
+      <div class="panel offers" id="offers"></div>
+      <section class="panel chart-panel">
+        <div class="chart-head">
+          <div class="picker">
+            <select id="pick" aria-label="Tria l'acció"></select>
+            <span class="big-price num" id="px"></span>
+            <span class="chg num" id="pxchg"></span>
+            <span id="pxst"></span>
+          </div>
+          <div class="seg" id="range">
+            <button type="button" data-r="6M">6 mesos</button><button type="button" data-r="1A">1 any</button><button type="button" data-r="5A">5 anys</button>
+          </div>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="chart-box"><canvas id="cv" aria-label="Gràfica de preu i mitjanes"></canvas></div>
+        <div class="rsi-title" id="rsiTitle">RSI de 14 dies · per sota de 30 = sobrevenda, per sobre de 70 = sobrecompra</div>
+        <div class="rsi-box" id="rsiBox"><canvas id="cvRsi" aria-label="Gràfica de l'RSI"></canvas></div>
+        <div class="stats" id="stats"></div>
+        <div class="score-explain" id="explain"></div>
+      </section>
+      <section class="panel table-panel">
+        <div class="th-head"><h2>Totes les accions</h2><span class="hint">Toca una fila per veure-la a la gràfica · toca una columna per ordenar</span></div>
+        <div class="tbl-scroll"><table>
+          <thead><tr>
+            <th data-k="t">Acció</th>
+            <th data-k="price">Preu ($)</th>
+            <th data-k="chgPct" class="hide-sm">Avui</th>
+            <th data-k="distWma">vs 200 setm.</th>
+            <th data-k="drawdown" class="hide-sm">Des del màx.</th>
+            <th data-k="rsi" class="hide-sm">RSI</th>
+            <th data-k="score">Puntuació</th>
+            <th data-k="status" class="hide-sm">Estat</th>
+          </tr></thead>
+          <tbody id="tb"></tbody>
+        </table></div>
+      </section>`;
+
+    const pick = document.getElementById('pick');
+    pick.innerHTML = data.tickers.map(t => `<option value="${t.t}">${t.t} · ${t.name}</option>`).join('');
+    pick.addEventListener('change', e => select(e.target.value));
+    document.getElementById('range').addEventListener('click', e => {
+      const r = e.target.dataset.r; if (!r) return; state.range = r; renderChart();
+    });
+    document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+      const k = th.dataset.k;
+      state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (k === 't' || k === 'distWma' || k === 'rsi' ? 1 : -1) };
+      renderTable();
+    }));
+
+    renderOffers();
+    renderTable();
+    renderChart();
+  }
+
+  function select(t) {
+    state.ticker = t;
+    try { localStorage.setItem('rt-ticker', t); } catch {}
+    renderTable();
+    renderChart();
+  }
+
+  const cur = () => state.data.tickers.find(t => t.t === state.ticker);
+  const statusPill = (s) => `<span class="st ${s}"><span aria-hidden="true">${STATUS[s].icon}</span>${STATUS[s].label}</span>`;
+
+  function renderOffers() {
+    const el = document.getElementById('offers');
+    const th = state.data.thresholds;
+    const hits = state.data.tickers.filter(t => t.status === 'oferta' || (t.distWma != null && t.distWma <= th.wmaNear) || t.rsi < th.rsi)
+      .sort((a, b) => b.score - a.score);
+    if (!hits.length) {
+      el.innerHTML = `<span class="label">${statusPill('alt')}</span><span class="none">Avui cap acció no és en zona d'oferta. Cap senyal de compra destacat.</span>`;
+      return;
+    }
+    el.innerHTML = `<span class="label">Senyals d'avui</span>` + hits.map(t => {
+      const why = [];
+      if (t.status === 'oferta') why.push(`${t.score}/100`);
+      if (t.distWma != null && t.distWma <= th.wmaNear) why.push(t.distWma < 0 ? 'sota 200 setm.' : 'prop 200 setm.');
+      if (t.rsi < th.rsi) why.push('RSI ' + Math.round(t.rsi));
+      return `<button class="chip" type="button" data-t="${t.t}"><span style="color:var(--good)" aria-hidden="true">●</span><b>${t.t}</b> ${why.join(' · ')}</button>`;
+    }).join('');
+    el.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => { select(c.dataset.t); document.getElementById('pick').scrollIntoView({ behavior: 'smooth', block: 'center' }); }));
+  }
+
+  function renderTable() {
+    const { key, dir } = state.sort;
+    const order = { oferta: 2, vigilar: 1, alt: 0 };
+    const rows = [...state.data.tickers].sort((a, b) => {
+      let x = a[key], y = b[key];
+      if (key === 'status') { x = order[x]; y = order[y]; }
+      if (typeof x === 'string') return dir * x.localeCompare(y);
+      return dir * ((x ?? -Infinity) - (y ?? -Infinity));
+    });
+    document.querySelectorAll('th').forEach(th => {
+      th.classList.toggle('sorted', th.dataset.k === key);
+      th.textContent = th.textContent.replace(/ [↑↓]$/, '') + (th.dataset.k === key ? (dir > 0 ? ' ↑' : ' ↓') : '');
+    });
+    document.getElementById('tb').innerHTML = rows.map(t => `
+      <tr data-t="${t.t}" class="${t.t === state.ticker ? 'sel' : ''}">
+        <td><span class="tk">${t.t}</span>${t.stale ? ' <span class="stale" title="No s\'ha pogut actualitzar avui">· antic</span>' : ''}<span class="nm">${t.name}</span></td>
+        <td class="num">${fmt(t.price)}</td>
+        <td class="num hide-sm ${t.chgPct > 0 ? 'up' : t.chgPct < 0 ? 'down' : ''}">${pct(t.chgPct, 2)}</td>
+        <td class="num">${pct(t.distWma)}</td>
+        <td class="num hide-sm">${t.drawdown > 0.05 ? '−' + fmt(t.drawdown, 1) + '%' : '0%'}</td>
+        <td class="num hide-sm">${fmt(t.rsi, 0)}</td>
+        <td><span class="scorebar"><span class="bar"><i style="width:${t.score}%;${t.status === 'oferta' ? 'background:var(--good)' : t.status === 'vigilar' ? 'background:var(--warn)' : ''}"></i></span><span class="num">${t.score}</span></span></td>
+        <td class="hide-sm">${statusPill(t.status)}</td>
+      </tr>`).join('');
+    document.querySelectorAll('#tb tr').forEach(tr => tr.addEventListener('click', () => {
+      select(tr.dataset.t);
+      if (window.innerWidth < 900) document.getElementById('pick').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }));
+  }
+
+  function lineIcon(color, dash) {
+    const d = dash.length ? `stroke-dasharray="${dash.join(',')}"` : '';
+    return `<svg width="22" height="8" aria-hidden="true"><line x1="1" y1="4" x2="21" y2="4" stroke="${color}" stroke-width="2.5" stroke-linecap="round" ${d}/></svg>`;
+  }
+
+  function renderChart() {
+    const t = cur();
+    if (!t) return;
+    document.getElementById('pick').value = t.t;
+    document.getElementById('px').textContent = fmt(t.price) + ' $';
+    const chg = document.getElementById('pxchg');
+    chg.textContent = pct(t.chgPct, 2) + ' avui';
+    chg.className = 'chg num ' + (t.chgPct > 0 ? 'up' : t.chgPct < 0 ? 'down' : '');
+    document.getElementById('pxst').innerHTML = statusPill(t.status);
+    document.querySelectorAll('#range button').forEach(b => b.classList.toggle('on', b.dataset.r === state.range));
+
+    const weekly = state.range === '5A';
+    const src = weekly ? t.weekly : t.daily;
+    const n = state.range === '6M' ? 126 : state.range === '1A' ? 252 : src.d.length;
+    const start = Math.max(0, src.d.length - n);
+    const labels = src.d.slice(start);
+
+    // llegenda (botons per amagar/mostrar)
+    const lg = document.getElementById('legend');
+    lg.innerHTML = SERIES.map(s => {
+      const dis = weekly && s.dailyOnly;
+      return `<button type="button" class="lg ${state.show[s.key] ? '' : 'off'}" data-k="${s.key}" ${dis ? 'disabled title="Només a 6 mesos i 1 any"' : ''} aria-pressed="${state.show[s.key]}">${lineIcon(css(s.color), s.dash)}${s.label}</button>`;
+    }).join('');
+    lg.querySelectorAll('.lg').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.k;
+      if (k === 'c' && Object.values(state.show).filter(Boolean).length === 1 && state.show.c) return;
+      state.show[k] = !state.show[k];
+      try { localStorage.setItem('rt-show', JSON.stringify(state.show)); } catch {}
+      renderChart();
+    }));
+
+    const grid = css('--grid'), text3 = css('--text-3'), text = css('--text'), surface = css('--surface'), border = css('--border');
+    const datasets = SERIES.filter(s => src[s.key] && state.show[s.key] && !(weekly && s.dailyOnly)).map(s => ({
+      label: s.label, key: s.key,
+      data: src[s.key].slice(start),
+      borderColor: css(s.color), backgroundColor: css(s.color),
+      borderWidth: s.width, borderDash: s.dash,
+      pointRadius: 0, pointHoverRadius: s.key === 'c' ? 5 : 4, pointHoverBorderWidth: 2, pointHoverBorderColor: surface,
+      tension: 0, spanGaps: true, order: s.key === 'c' ? 0 : 1,
+    }));
+
+    const crosshair = {
+      id: 'crosshair',
+      afterDraw(chart) {
+        const a = chart.tooltip?.getActiveElements?.();
+        if (!a || !a.length) return;
+        const x = a[0].element.x, { top, bottom } = chart.chartArea, ctx = chart.ctx;
+        ctx.save(); ctx.strokeStyle = text3; ctx.globalAlpha = .5; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
+      }
+    };
+
+    const baseOpts = {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: surface, titleColor: text, bodyColor: text, borderColor: border, borderWidth: 1,
+          padding: 10, boxPadding: 4, usePointStyle: true,
+          titleFont: { family: '"IBM Plex Sans", system-ui, sans-serif', weight: '600' }, bodyFont: { family: '"IBM Plex Mono", ui-monospace, monospace' },
+          callbacks: {
+            title: (it) => (weekly ? 'Setmana del ' : '') + dLabel(labels[it[0].dataIndex], true),
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false }, border: { color: border },
+          ticks: { color: text3, maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 720 ? 4 : 7,
+                   callback: (v, i) => dLabel(labels[i], weekly || state.range === '1A') ,
+                   font: { family: '"IBM Plex Sans", system-ui, sans-serif', size: 11 } },
+        },
+      },
+    };
+
+    const cfg = {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        ...baseOpts,
+        plugins: { ...baseOpts.plugins, tooltip: { ...baseOpts.plugins.tooltip, callbacks: { ...baseOpts.plugins.tooltip.callbacks,
+          label: (it) => ` ${it.dataset.label}: ${fmt(it.parsed.y)} $`,
+          labelPointStyle: () => ({ pointStyle: 'line', rotation: 0 }),
+        } } },
+        scales: { ...baseOpts.scales, y: { position: 'right', grid: { color: grid }, border: { display: false },
+          ticks: { color: text3, font: { family: '"IBM Plex Mono", ui-monospace, monospace', size: 11 }, callback: v => fmt(v, v >= 1000 ? 0 : v >= 100 ? 0 : 1) } } },
+      },
+      plugins: [crosshair],
+    };
+    if (state.chart) state.chart.destroy();
+    state.chart = new Chart(document.getElementById('cv'), cfg);
+
+    // RSI (gràfica pròpia: escala 0-100 diferent de la del preu)
+    const rsiBox = document.getElementById('rsiBox'), rsiTitle = document.getElementById('rsiTitle');
+    rsiBox.style.display = rsiTitle.style.display = weekly ? 'none' : '';
+    if (state.rsiChart) { state.rsiChart.destroy(); state.rsiChart = null; }
+    if (!weekly) {
+      const bands = {
+        id: 'bands',
+        beforeDatasetsDraw(chart) {
+          const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+          ctx.save();
+          ctx.fillStyle = css('--good'); ctx.globalAlpha = .10;
+          ctx.fillRect(left, y.getPixelForValue(30), right - left, y.getPixelForValue(0) - y.getPixelForValue(30));
+          ctx.globalAlpha = 1; ctx.strokeStyle = text3; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+          [30, 70].forEach(v => { const py = y.getPixelForValue(v); ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(right, py); ctx.stroke(); });
+          ctx.restore();
+        }
+      };
+      state.rsiChart = new Chart(document.getElementById('cvRsi'), {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'RSI 14', data: t.daily.rsi.slice(start), borderColor: text3, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: text, pointHoverBorderColor: surface, tension: 0 }] },
+        options: {
+          ...baseOpts,
+          plugins: { ...baseOpts.plugins, tooltip: { ...baseOpts.plugins.tooltip, callbacks: { ...baseOpts.plugins.tooltip.callbacks, label: it => ` RSI: ${fmt(it.parsed.y, 0)}` } } },
+          scales: { x: { ...baseOpts.scales.x, ticks: { ...baseOpts.scales.x.ticks, display: false } },
+                    y: { position: 'right', min: 0, max: 100, grid: { display: false }, border: { display: false },
+                         afterBuildTicks: ax => { ax.ticks = [30, 70].map(v => ({ value: v })); },
+                         ticks: { color: text3, font: { family: '"IBM Plex Mono", ui-monospace, monospace', size: 11 } } } },
+        },
+        plugins: [bands, crosshair],
+      });
+    }
+
+    // fitxa
+    document.getElementById('stats').innerHTML = [
+      ['Mitjana 200 setmanes', fmt(t.wma200) + ' $', `Preu ${pct(t.distWma)} respecte a la mitjana`],
+      ['Màxim 52 setmanes', fmt(t.high52) + ' $', t.drawdown > 0.05 ? `Ha caigut un ${fmt(t.drawdown, 1)}%` : 'Cotitza en màxims'],
+      ['RSI 14 dies', fmt(t.rsi, 0), t.rsi < 30 ? 'Sobrevenda' : t.rsi > 70 ? 'Sobrecompra' : 'Zona neutra'],
+      ['Mitjanes 50 / 200 dies', `${fmt(t.sma50, 0)} / ${fmt(t.sma200, 0)}`, t.sma50 > t.sma200 ? 'Tendència alcista (50 > 200)' : 'Tendència baixista (50 < 200)'],
+    ].map(([k, v, h]) => `<div class="stat"><div class="k">${k}</div><div class="v num">${v}</div><div class="h">${h}</div></div>`).join('');
+
+    const p = t.parts;
+    document.getElementById('explain').innerHTML = `
+      <b style="color:var(--text)">Puntuació d'oferta: <span class="num">${t.score}</span>/100</b>
+      <div class="parts" role="img" aria-label="Desglossament de la puntuació">
+        <span style="width:${p.wma}%;background:var(--s-wma)"></span><span style="width:${p.dd}%;background:var(--s-sma50)"></span><span style="width:${p.rsi}%;background:var(--s-sma200)"></span>
+      </div>
+      ${lineIcon(css('--s-wma'), [])} Mitjana 200 setm. <span class="num">${p.wma}</span>/40 &nbsp;
+      ${lineIcon(css('--s-sma50'), [])} Caiguda des del màx. <span class="num">${p.dd}</span>/35 &nbsp;
+      ${lineIcon(css('--s-sma200'), [])} RSI <span class="num">${p.rsi}</span>/25`;
+  }
+
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => state.data && renderChart(), 200); });
+})();
+</script>
+</body>
+</html>
