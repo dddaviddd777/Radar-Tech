@@ -1,0 +1,57 @@
+{
+ "NVDA": {
+  "oferta": true,
+  "wma": false,
+  "rsi": true
+ },
+ "GOOGL": {
+  "oferta": true,
+  "wma": false,
+  "rsi": false
+ },
+ "MSFT": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "AAPL": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "AMZN": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "META": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "AVGO": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "TSM": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "ASML": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "AMD": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ },
+ "TSLA": {
+  "oferta": false,
+  "wma": false,
+  "rsi": false
+ }
+}
