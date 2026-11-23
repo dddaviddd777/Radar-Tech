@@ -1,13 +1,13 @@
 {
  "NVDA": {
   "oferta": true,
-  "wma": true,
-  "rsi": true
+  "wma": false,
+  "rsi": false
  },
  "GOOGL": {
   "oferta": true,
   "wma": false,
-  "rsi": true
+  "rsi": false
  },
  "MSFT": {
   "oferta": false,
@@ -35,14 +35,14 @@
   "rsi": false
  },
  "TSM": {
-  "oferta": true,
+  "oferta": false,
   "wma": false,
-  "rsi": true
+  "rsi": false
  },
  "ASML": {
-  "oferta": true,
+  "oferta": false,
   "wma": false,
-  "rsi": true
+  "rsi": false
  },
  "AMD": {
   "oferta": false,
