@@ -40,7 +40,7 @@
   "rsi": false
  },
  "ASML": {
-  "oferta": false,
+  "oferta": true,
   "wma": false,
   "rsi": false
  },
