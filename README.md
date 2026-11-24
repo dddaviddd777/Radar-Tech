@@ -34,7 +34,9 @@ Tot es configura a dalt de `scripts/update.py`:
 - Pesos de la puntuació: `WEIGHT_WMA`, `WEIGHT_DD`, `WEIGHT_RSI`, `WEIGHT_PE` (han de sumar 100).
 - PER respecte al seu habitual: `PE_CHEAP`, `PE_DEAR`, `PE_YEARS`.
 
-Els fonamentals surten de Yahoo Finance. Si un dia no es poden descarregar, el dashboard conserva els de l'última vegada i la resta s'actualitza igual. El PER dels últims 12 mesos es calcula amb el benefici per acció que publica cada trimestre l'empresa. Si una empresa té pèrdues, el PER no té sentit i aquell component de la puntuació compta com si estigués a la seva mediana.
+Els fonamentals surten de Yahoo Finance. Si un dia no es poden descarregar, el dashboard conserva els de l'última vegada i la resta s'actualitza igual. El PER dels últims 12 mesos es calcula amb el benefici per acció que publica cada trimestre l'empresa. Com que Yahoo de vegades canvia el valor d'un trimestre ja publicat, cada trimestre es desa a `data/eps_history.json` la primera vegada que apareix i ja no es modifica.
+
+Si el programa s'executa amb Wall Street obert (per exemple, en llançar el workflow a mà durant el dia), ignora el preu provisional d'avui i fa servir l'últim tancament definitiu. Si una empresa té pèrdues, el PER no té sentit i aquell component de la puntuació compta com si estigués a la seva mediana.
 
 Per provar-ho a l'ordinador sense internet: `python scripts/update.py --demo` (genera dades inventades).
 

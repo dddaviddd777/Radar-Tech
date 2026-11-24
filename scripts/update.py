@@ -2,8 +2,9 @@
 Radar Tech — actualització diària de dades i alertes.
 
 Què fa:
-  1. Descarrega ~10 anys de cotitzacions diàries de cada acció (Yahoo Finance;
-     si falla, Stooq com a alternativa).
+  1. Descarrega ~10 anys de cotitzacions diàries de cada acció (Yahoo Finance).
+     Si s'executa amb Wall Street obert, ignora el dia en curs: només fa
+     servir preus de tancament definitius.
   2. Descarrega els fonamentals (Yahoo Finance): PER forward, preu objectiu
      dels analistes, data dels propers resultats i el benefici per acció de
      cada trimestre, amb el qual es reconstrueix l'historial del PER.
@@ -24,7 +25,6 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
-from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -70,6 +70,7 @@ RSI_ALERT = 30.0    # RSI per sota de 30
 ROOT = Path(__file__).resolve().parent.parent
 DATA_FILE = ROOT / "data" / "data.json"
 STATE_FILE = ROOT / "data" / "alert_state.json"
+EPS_FILE = ROOT / "data" / "eps_history.json"
 
 DAILY_DAYS = 260     # ~1 any de dades diàries per a la gràfica (6M i 1A)
 WEEKLY_WEEKS = 262   # ~5 anys de dades setmanals per a la gràfica (5A)
@@ -88,31 +89,32 @@ def fetch_yahoo(ticker: str) -> pd.Series:
     return s
 
 
-def fetch_stooq(ticker: str) -> pd.Series:
-    import requests
+MARKET_CLOSED_AFTER = (16, 20)  # hora de Nova York a partir de la qual el tancament és definitiu
 
-    url = f"https://stooq.com/q/d/l/?s={ticker.lower()}.us&i=d"
-    r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
-    r.raise_for_status()
-    df = pd.read_csv(StringIO(r.text))
-    if "Close" not in df.columns or df.empty:
-        raise ValueError("Stooq no ha retornat dades")
-    s = df.set_index(pd.to_datetime(df["Date"]))["Close"].dropna()
-    return s[s.index >= s.index.max() - pd.Timedelta(days=3700)]
+
+def drop_unfinished_day(s: pd.Series) -> pd.Series:
+    """Si Wall Street encara no ha tancat avui, treu la barra d'avui (és un preu provisional)."""
+    now_ny = pd.Timestamp.now(tz="America/New_York")
+    if (len(s) and s.index[-1] == now_ny.normalize().tz_localize(None)
+            and (now_ny.hour, now_ny.minute) < MARKET_CLOSED_AFTER):
+        print(f"     (mercat obert: s'ignora el preu provisional d'avui, {s.iloc[-1]:.2f})")
+        return s.iloc[:-1]
+    return s
 
 
 def fetch(ticker: str) -> pd.Series:
+    # Només Yahoo: Stooq, l'antiga font de reserva, ara bloqueja les descàrregues
+    # automàtiques. Si Yahoo falla tots els intents, es conserva l'últim valor bo.
     errors = []
-    for source in (fetch_yahoo, fetch_stooq):
-        for attempt in range(3):
-            try:
-                s = source(ticker)
-                if len(s) < 300:
-                    raise ValueError(f"massa poques dades ({len(s)})")
-                return s.sort_index()
-            except Exception as e:  # noqa: BLE001
-                errors.append(f"{source.__name__}: {e}")
-                time.sleep(2 + attempt * 3)
+    for attempt in range(4):
+        try:
+            s = fetch_yahoo(ticker)
+            if len(s) < 300:
+                raise ValueError(f"massa poques dades ({len(s)})")
+            return drop_unfinished_day(s.sort_index())
+        except Exception as e:  # noqa: BLE001
+            errors.append(str(e))
+            time.sleep(3 + attempt * 5)
     raise RuntimeError(f"{ticker}: " + " | ".join(errors[-2:]))
 
 
@@ -144,16 +146,11 @@ def fetch_fundamentals(ticker: str) -> dict:
             today = pd.Timestamp.today().normalize()
             upcoming = ed.index[ed.index >= today]
             eps = ed["Reported EPS"].dropna()
-            eps = eps[~eps.index.normalize().duplicated(keep="first")].sort_index()
-            # Les ADR (TSM, ASML) poden donar el BPA en una altra moneda que el preu.
-            # Ajustem l'escala perquè els últims 12 mesos coincideixin amb el BPA
-            # de Yahoo en dòlars. La comparació amb l'historial no en depèn.
-            ttm_last = eps.iloc[-4:].sum() if len(eps) >= 4 else None
-            tr_eps = num(info.get("trailingEps"))
-            if (info.get("financialCurrency") not in (None, "USD") and ttm_last and tr_eps
-                    and 0.5 < tr_eps / ttm_last < 2):
-                eps = eps * (tr_eps / ttm_last)
+            eps.index = eps.index.normalize()
+            eps = eps[~eps.index.duplicated(keep="first")].sort_index()
             return {
+                "trailingEps": num(info.get("trailingEps")),
+                "foreign": info.get("financialCurrency") not in (None, "USD"),
                 "fwdPE": num(info.get("forwardPE")),
                 "target": num(info.get("targetMeanPrice")),
                 "analysts": info.get("numberOfAnalystOpinions"),
@@ -165,6 +162,37 @@ def fetch_fundamentals(ticker: str) -> dict:
             last_err = e
             time.sleep(2 + attempt * 3)
     raise RuntimeError(f"fonamentals {ticker}: {last_err}")
+
+
+def stable_eps(ticker: str, fund: dict | None, cache: dict) -> pd.Series | None:
+    """BPA trimestral estable.
+
+    Yahoo de vegades canvia el BPA d'un trimestre ja publicat (un dia dona el
+    comptable i un altre l'ajustat), i el PER saltaria sense motiu. Per evitar-ho,
+    cada trimestre es desa a data/eps_history.json la primera vegada que apareix
+    i després ja no es modifica. Si avui no hi ha fonamentals, es fa servir l'arxiu.
+    """
+    entry = cache.setdefault(ticker, {"eps": {}, "scale": 1.0})
+    saved = {pd.Timestamp(d): v for d, v in entry["eps"].items()}
+    if fund is not None and fund.get("eps") is not None:
+        for d, v in fund["eps"].items():
+            # mateix trimestre si ja n'hi ha un de desat a menys de 20 dies
+            if not any(abs((d - s).days) < 20 for s in saved):
+                saved[d] = float(v)
+    if len(saved) < 4:
+        return None
+    eps = pd.Series(saved).sort_index()
+    entry["eps"] = {d.strftime("%Y-%m-%d"): round(v, 4) for d, v in eps.items()}
+
+    # Les ADR (TSM, ASML) poden donar el BPA en una altra moneda que el preu.
+    # Ajustem l'escala perquè els últims 12 mesos coincideixin amb el BPA de
+    # Yahoo en dòlars. La comparació amb l'historial no en depèn.
+    if fund is not None and fund.get("foreign") and fund.get("trailingEps"):
+        ttm = eps.iloc[-4:].sum()
+        k = fund["trailingEps"] / ttm if ttm else 0
+        if 0.5 < k < 2:
+            entry["scale"] = round(k, 4)
+    return eps * entry.get("scale", 1.0)
 
 
 def fake_fundamentals(ticker: str, close: pd.Series) -> dict:
@@ -374,7 +402,10 @@ def run_alerts(rows: list, demo: bool):
     old = {}
     if STATE_FILE.exists():
         old = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    new_state, messages = {}, []
+    # Les accions que avui no s'han pogut descarregar mantenen l'estat d'ahir,
+    # perquè demà no tornin a avisar d'un senyal que ja s'havia avisat.
+    new_state = {t: v for t, v in old.items() if t in TICKERS}
+    messages = []
     for row in rows:
         sig = signals(row)
         new_state[row["t"]] = sig
@@ -405,6 +436,13 @@ def main():
         except Exception:  # noqa: BLE001
             pass
 
+    eps_cache = {}
+    if EPS_FILE.exists() and not demo:
+        try:
+            eps_cache = json.loads(EPS_FILE.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            pass
+
     rows, failed, fund_failed = [], [], []
     for t in TICKERS:
         try:
@@ -416,7 +454,8 @@ def main():
                 print(f"AVÍS {e}")
                 fund_failed.append(t)
                 fund = None
-            row = analyse(t, close, fund)
+            eps = stable_eps(t, fund, eps_cache)
+            row = analyse(t, close, {**(fund or {}), "eps": eps})
             if fund is None and t in previous:  # conservem els últims valors bons
                 for k in ("fwdPE", "target", "analysts", "rec", "nextEarnings"):
                     row[k] = previous[t].get(k)
@@ -429,6 +468,9 @@ def main():
             failed.append(t)
             if t in previous:  # conservem l'últim valor bo
                 rows.append({**previous[t], "stale": True})
+
+    if not demo:
+        EPS_FILE.write_text(json.dumps(eps_cache, indent=1, sort_keys=True), encoding="utf-8")
 
     if not rows:
         sys.exit("No s'ha pogut descarregar cap acció.")
